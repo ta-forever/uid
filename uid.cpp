@@ -58,7 +58,8 @@ int main(int argc, char *argv[])
   machine_info_free();
 
   //std::cout << root << std::endl;
-  std::string json_string = std::string("2") + Json::FastWriter().write(root);
+  Json::StreamWriterBuilder json_builder;
+  std::string json_string = std::string("2") + Json::writeString(json_builder, root);
   //std::cout << json_string << "<-END" << std::endl;
 
   try
