@@ -57,6 +57,10 @@ endif()
 
 add_definitions(-DUID_PUBKEY_BYTES=${UID_PUBKEY_BYTES})
 
+if (WIN32)
+  add_definitions(-DWIN32FAFUID)
+endif()
+
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
 
 add_executable(faf-uid
