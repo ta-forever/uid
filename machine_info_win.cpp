@@ -227,7 +227,7 @@ std::vector<std::string> read_wmi_values(std::wstring const& table,
       if (vtProp.vt == VT_BSTR)
       {
         std::string propString;
-        UnicodeString(vtProp.bstrVal).toUTF8String(propString);
+        icu::UnicodeString(vtProp.bstrVal).toUTF8String(propString);
         result.push_back(propString);
       }
       else if (vtProp.vt == VT_I4)
