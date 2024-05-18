@@ -1,0 +1,162 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release Version"
+        required: true
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    env:
+      MXE_DIR: /usr/lib/mxe
+      MXE_TARGET: x86_64-w64-mingw32.static
+      MXE_PACKAGE_PREFIX: mxe-x86-64-w64-mingw32.static
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure MXE
+        run: |
+          echo "deb https://pkg.mxe.cc/repos/apt focal main" | sudo tee /etc/apt/sources.list.d/mxeapt.list
+          wget -qO- https://pkg.mxe.cc/repos/apt/client-conf/mxeapt.gpg | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/mxeapt.gpg
+          sudo apt-get update
+
+          # the part without MXE_PACKAGE_PREFIX is from https://mxe.cc/#requirements
+          sudo apt-get install \
+              autoconf \
+              automake \
+              autopoint \
+              bash \
+              bison \
+              bzip2 \
+              flex \
+              g++ \
+              g++-multilib \
+              gettext \
+              git \
+              gperf \
+              intltool \
+              libc6-dev-i386 \
+              libgdk-pixbuf2.0-dev \
+              libltdl-dev \
+              libgl-dev \
+              libpcre3-dev \
+              libssl-dev \
+              libtool-bin \
+              libxml-parser-perl \
+              lzip \
+              make \
+              openssl \
+              p7zip-full \
+              patch \
+              perl \
+              python3 \
+              python3-distutils \
+              python3-mako \
+              python3-packaging \
+              python3-pkg-resources \
+              python-is-python3 \
+              ruby \
+              sed \
+              sqlite3 \
+              unzip \
+              wget \
+              xz-utils \
+              $MXE_PACKAGE_PREFIX-jsoncpp \
+              $MXE_PACKAGE_PREFIX-cryptopp \
+              $MXE_PACKAGE_PREFIX-icu4c
+
+      - name: Build
+        run: |
+          $MXE_DIR/usr/bin/$MXE_TARGET-cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCRYPTOPP_LIBRARIES=/usr/lib/mxe/usr/$MXE_TARGET/lib/libcryptopp.a \
+            -DCRYPTOPP_INCLUDE_DIRS=/usr/lib/mxe/usr/$MXE_TARGET/include \
+            -DUID_SKIP_LEGACY=On \
+            -B build
+          make -C build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: faf-uid.exe
+          path: build/faf-uid.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    env:
+      JSONCPP_VERSION: 1.7.7
+      CRYPTOPP_VERSION: 8_9_0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build jsoncpp
+        run: |
+          wget https://github.com/open-source-parsers/jsoncpp/archive/$JSONCPP_VERSION.tar.gz -O jsoncpp.tar.gz
+          tar xfz jsoncpp.tar.gz
+          mkdir jsoncpp-build
+          cmake \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF \
+            -DBUILD_STATIC_LIBS=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -B jsoncpp-build \
+            -S jsoncpp-$JSONCPP_VERSION
+          make -C jsoncpp-build
+
+      - name: Build cryptopp
+        run: |
+          wget https://github.com/weidai11/cryptopp/archive/CRYPTOPP_$CRYPTOPP_VERSION.zip -O cryptopp.zip
+          unzip ./cryptopp.zip
+          mv cryptopp-CRYPTOPP_$CRYPTOPP_VERSION cryptopp
+          make -C cryptopp -f GNUmakefile CXXFLAGS='-DNDEBUG -O3' libcryptopp.a
+
+      - name: Build
+        run: |
+          cmake \
+            -DJSONCPP_LIBRARIES=$(pwd)/jsoncpp-build/src/lib_json/libjsoncpp.a \
+            -DJSONCPP_INCLUDE_DIRS=$(pwd)/jsoncpp-$JSONCPP_VERSION/include \
+            -DCRYPTOPP_LIBRARIES=$(pwd)/cryptopp/libcryptopp.a \
+            -DCRYPTOPP_INCLUDE_DIRS=$(pwd)/cryptopp \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -B build
+          make -C build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: faf-uid
+          path: build/faf-uid
+
+  create-release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: faf-uid.exe
+          path: release-artifacts/
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: faf-uid
+          path: release-artifacts/
+
+      - name: Create release
+        id: create_release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          commit: ${{ github.sha }}
+          tag: ${{ github.event.inputs.version }}
+          draft: true
+          prerelease: true
+          artifacts: "release-artifacts/*"
