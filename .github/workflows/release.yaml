@@ -82,7 +82,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: faf-uid.exe
+          name: faf-uid-windows
           path: build/faf-uid.exe
 
   build-linux:
@@ -98,7 +98,6 @@ jobs:
         run: |
           wget https://github.com/open-source-parsers/jsoncpp/archive/$JSONCPP_VERSION.tar.gz -O jsoncpp.tar.gz
           tar xfz jsoncpp.tar.gz
-          mkdir jsoncpp-build
           cmake \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
             -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF \
@@ -129,7 +128,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: faf-uid
+          name: faf-uid-linux
           path: build/faf-uid
 
   create-release:
@@ -142,13 +141,13 @@ jobs:
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: faf-uid.exe
+          name: faf-uid-windows
           path: release-artifacts/
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: faf-uid
+          name: faf-uid-linux
           path: release-artifacts/
 
       - name: Create release
