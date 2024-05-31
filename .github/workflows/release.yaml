@@ -10,13 +10,18 @@ on:
 jobs:
   build-windows:
     runs-on: ubuntu-latest
+    environment: release
     env:
+      PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
       MXE_DIR: /usr/lib/mxe
       MXE_TARGET: x86_64-w64-mingw32.static
       MXE_PACKAGE_PREFIX: mxe-x86-64-w64-mingw32.static
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Write PUB key into file
+        run: echo "$PUB_KEY" > faf_pub.pem
 
       - name: Configure MXE
         run: |
@@ -73,9 +78,10 @@ jobs:
         run: |
           $MXE_DIR/usr/bin/$MXE_TARGET-cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCRYPTOPP_LIBRARIES=/usr/lib/mxe/usr/$MXE_TARGET/lib/libcryptopp.a \
-            -DCRYPTOPP_INCLUDE_DIRS=/usr/lib/mxe/usr/$MXE_TARGET/include \
+            -DCRYPTOPP_LIBRARIES=$MXE_DIR/usr/$MXE_TARGET/lib/libcryptopp.a \
+            -DCRYPTOPP_INCLUDE_DIRS=$MXE_DIR/usr/$MXE_TARGET/include \
             -DUID_SKIP_LEGACY=On \
+            -DUID_PUBKEY_BYTES=$(./encode_openssl_modulus.py $(openssl rsa -noout -inform PEM -in faf_pub.pem -pubin -modulus)) \
             -B build
           make -C build
 
@@ -87,12 +93,17 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    environment: release
     env:
+      PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
       JSONCPP_VERSION: 1.7.7
       CRYPTOPP_VERSION: 8_9_0
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Write PUB key into file
+        run: echo "$PUB_KEY" > faf_pub.pem
 
       - name: Build jsoncpp
         run: |
@@ -122,6 +133,7 @@ jobs:
             -DCRYPTOPP_LIBRARIES=$(pwd)/cryptopp/libcryptopp.a \
             -DCRYPTOPP_INCLUDE_DIRS=$(pwd)/cryptopp \
             -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DUID_PUBKEY_BYTES=$(./encode_openssl_modulus.py $(openssl rsa -noout -inform PEM -in faf_pub.pem -pubin -modulus)) \
             -B build
           make -C build
 
