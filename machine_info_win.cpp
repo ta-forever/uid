@@ -3,15 +3,16 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include <regex>
 
 #include <unicode/unistr.h>
 
 #define _WIN32_DCOM
+#define _WIN32_WINNT 0x0600
 #include <iostream>
 #include <windows.h>
 #include <wbemidl.h>
 #include <comdef.h>
+#include <winuser.h>
 
 std::string exc_value("invalid");
 
@@ -227,7 +228,7 @@ std::vector<std::string> read_wmi_values(std::wstring const& table,
       if (vtProp.vt == VT_BSTR)
       {
         std::string propString;
-        UnicodeString(vtProp.bstrVal).toUTF8String(propString);
+        icu::UnicodeString(vtProp.bstrVal).toUTF8String(propString);
         result.push_back(propString);
       }
       else if (vtProp.vt == VT_I4)
@@ -262,18 +263,6 @@ std::string wmi_value(std::wstring const& table,
   return exc_value;
 }
 
-std::string match_regex(std::string const& input,
-                        char const* r_string)
-{
-  std::regex r(r_string);
-  std::smatch sm;
-  if (std::regex_search(input, sm, r))
-  {
-    return sm[1];
-  }
-  return exc_value;
-}
-
 std::string machine_info_uuid()
 {
   return wmi_value(L"Win32_ComputerSystemProduct",
@@ -294,24 +283,14 @@ std::string machine_info_manufacturer()
 
 std::string machine_info_display_width()
 {
-  std::string v_mode_desc = wmi_value(L"Win32_VideoController",
-                                      L"VideoModeDescription");
-  if (v_mode_desc == exc_value)
-  {
-    return exc_value;
-  }
-  return match_regex(v_mode_desc, "(\\d+) x \\d+ x \\d+ colors");
+  SetProcessDPIAware();
+  return std::to_string(GetSystemMetrics(SM_CXSCREEN));
 }
 
 std::string machine_info_display_height()
 {
-  std::string v_mode_desc = wmi_value(L"Win32_VideoController",
-                                      L"VideoModeDescription");
-  if (v_mode_desc == exc_value)
-  {
-    return exc_value;
-  }
-  return match_regex(v_mode_desc, "\\d+ x (\\d+) x \\d+ colors");
+  SetProcessDPIAware();
+  return std::to_string(GetSystemMetrics(SM_CYSCREEN));
 }
 
 std::string machine_info_memory_serial0()

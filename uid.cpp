@@ -3,13 +3,13 @@
 #include <cassert>
 #include <stdint.h>
 
-#include <cryptopp/aes.h>
-#include <cryptopp/modes.h>
-#include <cryptopp/osrng.h>
-#include <cryptopp/rsa.h>
-#include <cryptopp/base64.h>
-#include <cryptopp/integer.h>
-#include <cryptopp/files.h>
+#include "cryptopp/aes.h"
+#include "cryptopp/modes.h"
+#include "cryptopp/osrng.h"
+#include "cryptopp/rsa.h"
+#include "cryptopp/base64.h"
+#include "cryptopp/integer.h"
+#include "cryptopp/files.h"
 
 #include <json/json.h>
 
@@ -58,7 +58,8 @@ int main(int argc, char *argv[])
   machine_info_free();
 
   //std::cout << root << std::endl;
-  std::string json_string = std::string("2") + Json::FastWriter().write(root);
+  Json::StreamWriterBuilder json_builder;
+  std::string json_string = std::string("2") + Json::writeString(json_builder, root);
   //std::cout << json_string << "<-END" << std::endl;
 
   try
@@ -133,9 +134,15 @@ int main(int argc, char *argv[])
               new CryptoPP::FileSink(std::cout), false /*insertLineBreaks*/
           );
       b.Put(paddingSize);
+#ifdef WIN32FAFUID
       b.Put(reinterpret_cast<const byte*>(iv_b64.c_str()), iv_b64.size());
       b.Put(reinterpret_cast<const byte*>(json_string_encrypted_b64.c_str()), json_string_encrypted_b64.size());
       b.Put(reinterpret_cast<const byte*>(aes_key_encrypted_base64.c_str()), aes_key_encrypted_base64.size());
+#else
+      b.Put(reinterpret_cast<const CryptoPP::byte*>(iv_b64.c_str()), iv_b64.size());
+      b.Put(reinterpret_cast<const CryptoPP::byte*>(json_string_encrypted_b64.c_str()), json_string_encrypted_b64.size());
+      b.Put(reinterpret_cast<const CryptoPP::byte*>(aes_key_encrypted_base64.c_str()), aes_key_encrypted_base64.size());
+#endif
       b.MessageEnd();
     }
   }
