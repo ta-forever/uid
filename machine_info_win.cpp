@@ -1,3 +1,6 @@
+#define _WIN32_DCOM
+#define _WIN32_WINNT 0x0600
+
 #include "machine_info.h"
 
 #include <string>
@@ -6,8 +9,6 @@
 
 #include <unicode/unistr.h>
 
-#define _WIN32_DCOM
-#define _WIN32_WINNT 0x0600
 #include <iostream>
 #include <windows.h>
 #include <wbemidl.h>
