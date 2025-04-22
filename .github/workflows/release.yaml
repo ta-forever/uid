@@ -11,7 +11,7 @@ jobs:
   build-windows:
     runs-on: ubuntu-latest
     container:
-      image: mxe/mxe:latest
+      image: tonioloewald/mxe-base:latest
     environment: release
     env:
       PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
