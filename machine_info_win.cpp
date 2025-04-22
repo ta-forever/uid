@@ -7,8 +7,6 @@
 #include <sstream>
 #include <vector>
 
-#include <unicode/unistr.h>
-
 #include <iostream>
 #include <windows.h>
 #include <wbemidl.h>
@@ -229,12 +227,29 @@ std::vector<std::string> read_wmi_values(std::wstring const& table,
       if (vtProp.vt == VT_BSTR)
       {
         std::string propString;
-        icu::UnicodeString(vtProp.bstrVal).toUTF8String(propString);
+        if (vtProp.bstrVal != nullptr) {
+            int size_needed = WideCharToMultiByte(
+                CP_UTF8, 0,
+                vtProp.bstrVal, -1,         // input BSTR (UTF-16)
+                nullptr, 0,                 // output buffer null for size query
+                nullptr, nullptr);
+
+            if (size_needed > 0) {
+                propString.resize(size_needed - 1); // exclude null terminator
+                WideCharToMultiByte(
+                    CP_UTF8, 0,
+                    vtProp.bstrVal, -1,
+                    &propString[0], size_needed,
+                    nullptr, nullptr);
+            }
+        }
         result.push_back(propString);
       }
       else if (vtProp.vt == VT_I4)
       {
-        result.push_back(static_cast< std::ostringstream & >(( std::ostringstream() << std::dec << vtProp.iVal ) ).str());
+        std::ostringstream ss;
+        ss << std::dec << vtProp.iVal;
+        result.push_back(ss.str());
       }
 
       VariantClear(&vtProp);

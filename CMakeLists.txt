@@ -32,16 +32,8 @@ endif()
 include_directories(${CRYPTOPP_INCLUDE_DIRS})
 
 if (WIN32)
-  if(NOT PKGCONFIG_FOUND)
-    find_package(PkgConfig REQUIRED)
-  endif()
-  pkg_search_module(ICU REQUIRED icu-uc)
-  include_directories(${ICU_INCLUDE_DIRS})
   set(machine_info_src machine_info_win.cpp)
-  set(machine_info_libs
-    ${ICU_LIBRARIES}
-    wbemuuid.lib
-      )
+  set(machine_info_libs wbemuuid.lib)
 else()
   set(machine_info_src machine_info_linux.cpp)
 endif()
@@ -57,7 +49,8 @@ endif()
 
 add_definitions(-DUID_PUBKEY_BYTES=${UID_PUBKEY_BYTES})
 
-if (WIN32)
+if (WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR
+               CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
   add_definitions(-DWIN32FAFUID)
 endif()
 

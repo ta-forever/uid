@@ -8,129 +8,62 @@ on:
         required: true
 
 jobs:
-  build-windows:
+  build:
     runs-on: ubuntu-latest
-    container:
-      image: tonioloewald/mxe-base:latest
+    strategy:
+      matrix:
+        target: [win32, win64, linux64]
     environment: release
     env:
       PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
-      MXE_TARGET: i686-w64-mingw32.static
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Python and unzip
+      - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install -y python3 python3-pip unzip
+          sudo apt-get update
+          sudo apt-get install -y unzip wget cmake make g++ python3 python3-pip zip
+
+      - name: Download and extract llvm-mingw (for Windows targets)
+        if: matrix.target == 'win32' || matrix.target == 'win64'
+        run: |
+          wget -q https://github.com/mstorsjo/llvm-mingw/releases/download/20250417/llvm-mingw-20250417-ucrt-ubuntu-22.04-x86_64.tar.xz -O llvm-mingw.tar.xz
+          mkdir -p /opt/llvm-mingw
+          tar -xf llvm-mingw.tar.xz -C /opt/llvm-mingw --strip-components=1
+          echo "LLVM_MINGW_DIR=/opt/llvm-mingw" >> $GITHUB_ENV
+          echo "/opt/llvm-mingw/bin" >> $GITHUB_PATH
 
       - name: Write PUB key into file
         run: echo "$PUB_KEY" > faf_pub.pem
 
-      - name: Build
+      - name: Run build script
         run: |
-          /usr/bin/${MXE_TARGET}-cmake \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCRYPTOPP_LIBRARIES=/usr/${MXE_TARGET}/lib/libcryptopp.a \
-            -DCRYPTOPP_INCLUDE_DIRS=/usr/${MXE_TARGET}/include \
-            -DUID_SKIP_LEGACY=On \
-            -DUID_PUBKEY_BYTES=$(./encode_openssl_modulus.py $(openssl rsa -noout -inform PEM -in faf_pub.pem -pubin -modulus)) \
-            -B build
-          make -C build
+          chmod +x ./build.sh
+          ./build.sh ${{ matrix.target }}
+
+      - name: Package executable
+        run: |
+          cd build/${{ matrix.target }}
+          zip faf-uid-${{ matrix.target }}.zip faf-uid*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: faf-uid-windows
-          path: build/faf-uid.exe
-
-  build-linux:
-    runs-on: ubuntu-latest
-    container:
-      image: ubuntu:20.04
-    environment: release
-    env:
-      PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
-      JSONCPP_VERSION: 1.7.7
-      CRYPTOPP_VERSION: 8_9_0
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          apt-get update
-          apt-get install -y \
-            build-essential \
-            cmake \
-            wget \
-            unzip \
-            python3 \
-            python3-pip \
-            git \
-            curl \
-            pkg-config
-
-      - name: Write PUB key into file
-        run: echo "$PUB_KEY" > faf_pub.pem
-
-      - name: Build jsoncpp
-        run: |
-          wget https://github.com/open-source-parsers/jsoncpp/archive/$JSONCPP_VERSION.tar.gz -O jsoncpp.tar.gz
-          tar xfz jsoncpp.tar.gz
-          cmake \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF \
-            -DBUILD_STATIC_LIBS=ON \
-            -DBUILD_SHARED_LIBS=OFF \
-            -B jsoncpp-build \
-            -S jsoncpp-$JSONCPP_VERSION
-          make -C jsoncpp-build
-
-      - name: Build cryptopp
-        run: |
-          wget https://github.com/weidai11/cryptopp/archive/CRYPTOPP_$CRYPTOPP_VERSION.zip -O cryptopp.zip
-          unzip cryptopp.zip
-          mv cryptopp-CRYPTOPP_$CRYPTOPP_VERSION cryptopp
-          make -C cryptopp -f GNUmakefile CXXFLAGS='-DNDEBUG -O3' libcryptopp.a
-
-      - name: Build
-        run: |
-          cmake \
-            -DJSONCPP_LIBRARIES=$(pwd)/jsoncpp-build/src/lib_json/libjsoncpp.a \
-            -DJSONCPP_INCLUDE_DIRS=$(pwd)/jsoncpp-$JSONCPP_VERSION/include \
-            -DCRYPTOPP_LIBRARIES=$(pwd)/cryptopp/libcryptopp.a \
-            -DCRYPTOPP_INCLUDE_DIRS=$(pwd)/cryptopp \
-            -DCMAKE_BUILD_TYPE=MinSizeRel \
-            -DUID_PUBKEY_BYTES=$(./encode_openssl_modulus.py $(openssl rsa -noout -inform PEM -in faf_pub.pem -pubin -modulus)) \
-            -B build
-          make -C build
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: faf-uid-linux
-          path: build/faf-uid
+          name: faf-uid-${{ matrix.target }}
+          path: build/${{ matrix.target }}/faf-uid-${{ matrix.target }}.zip
 
   create-release:
-    needs: [build-windows, build-linux]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Windows artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: faf-uid-windows
-          path: release-artifacts/
-
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: faf-uid-linux
-          path: release-artifacts/
+          path: release-artifacts
 
       - name: Create release
         id: create_release
@@ -140,4 +73,4 @@ jobs:
           tag: ${{ github.event.inputs.version }}
           draft: true
           prerelease: true
-          artifacts: "release-artifacts/*"
+          artifacts: "release-artifacts/**/*"

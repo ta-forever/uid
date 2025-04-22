@@ -1,5 +1,5 @@
-uid.build/**
-build/uid.build/**
+build
 .idea/**
+.venv
 __pycache__
 /CMakeLists.txt.user
