@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-windows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     environment: release
     env:
       PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
@@ -91,7 +91,7 @@ jobs:
           path: build/faf-uid.exe
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     environment: release
     env:
       PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
