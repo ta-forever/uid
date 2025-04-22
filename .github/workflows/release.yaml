@@ -9,76 +9,31 @@ on:
 
 jobs:
   build-windows:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    container:
+      image: mxe/mxe:latest
     environment: release
     env:
       PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
-      MXE_DIR: /usr/lib/mxe
       MXE_TARGET: i686-w64-mingw32.static
-      MXE_PACKAGE_PREFIX: mxe-i686-w64-mingw32.static
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Python and unzip
+        run: |
+          apt-get update
+          apt-get install -y python3 python3-pip unzip
 
       - name: Write PUB key into file
         run: echo "$PUB_KEY" > faf_pub.pem
 
-      - name: Configure MXE
-        run: |
-          echo "deb https://pkg.mxe.cc/repos/apt focal main" | sudo tee /etc/apt/sources.list.d/mxeapt.list
-          wget -qO- https://pkg.mxe.cc/repos/apt/client-conf/mxeapt.gpg | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/mxeapt.gpg
-          sudo apt-get update
-
-          # the part without MXE_PACKAGE_PREFIX is from https://mxe.cc/#requirements
-          sudo apt-get install \
-              autoconf \
-              automake \
-              autopoint \
-              bash \
-              bison \
-              bzip2 \
-              flex \
-              g++ \
-              g++-multilib \
-              gettext \
-              git \
-              gperf \
-              intltool \
-              libc6-dev-i386 \
-              libgdk-pixbuf2.0-dev \
-              libltdl-dev \
-              libgl-dev \
-              libpcre3-dev \
-              libssl-dev \
-              libtool-bin \
-              libxml-parser-perl \
-              lzip \
-              make \
-              openssl \
-              p7zip-full \
-              patch \
-              perl \
-              python3 \
-              python3-distutils \
-              python3-mako \
-              python3-packaging \
-              python3-pkg-resources \
-              python-is-python3 \
-              ruby \
-              sed \
-              sqlite3 \
-              unzip \
-              wget \
-              xz-utils \
-              $MXE_PACKAGE_PREFIX-jsoncpp \
-              $MXE_PACKAGE_PREFIX-cryptopp \
-              $MXE_PACKAGE_PREFIX-icu4c
-
       - name: Build
         run: |
-          $MXE_DIR/usr/bin/$MXE_TARGET-cmake \
+          /usr/bin/${MXE_TARGET}-cmake \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCRYPTOPP_LIBRARIES=$MXE_DIR/usr/$MXE_TARGET/lib/libcryptopp.a \
-            -DCRYPTOPP_INCLUDE_DIRS=$MXE_DIR/usr/$MXE_TARGET/include \
+            -DCRYPTOPP_LIBRARIES=/usr/${MXE_TARGET}/lib/libcryptopp.a \
+            -DCRYPTOPP_INCLUDE_DIRS=/usr/${MXE_TARGET}/include \
             -DUID_SKIP_LEGACY=On \
             -DUID_PUBKEY_BYTES=$(./encode_openssl_modulus.py $(openssl rsa -noout -inform PEM -in faf_pub.pem -pubin -modulus)) \
             -B build
@@ -91,7 +46,9 @@ jobs:
           path: build/faf-uid.exe
 
   build-linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
     environment: release
     env:
       PUB_KEY: ${{ secrets.UID_PUBLIC_KEY_PEM }}
@@ -100,6 +57,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            cmake \
+            wget \
+            unzip \
+            python3 \
+            python3-pip \
+            git \
+            curl \
+            pkg-config
 
       - name: Write PUB key into file
         run: echo "$PUB_KEY" > faf_pub.pem
@@ -120,7 +91,7 @@ jobs:
       - name: Build cryptopp
         run: |
           wget https://github.com/weidai11/cryptopp/archive/CRYPTOPP_$CRYPTOPP_VERSION.zip -O cryptopp.zip
-          unzip ./cryptopp.zip
+          unzip cryptopp.zip
           mv cryptopp-CRYPTOPP_$CRYPTOPP_VERSION cryptopp
           make -C cryptopp -f GNUmakefile CXXFLAGS='-DNDEBUG -O3' libcryptopp.a
 
